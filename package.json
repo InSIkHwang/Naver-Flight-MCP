@@ -1,7 +1,24 @@
 {
   "name": "naver-flight-mcp",
-  "version": "0.0.1",
-  "description": "naver-flight-mcp MCP server",
+  "version": "0.1.0",
+  "description": "MCP server for searching Naver flight tickets with lowest prices",
+  "author": "Your Name",
+  "license": "MIT",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "naver",
+    "flight",
+    "travel",
+    "tickets"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/naver-flight-mcp.git"
+  },
+  "bugs": {
+    "url": "https://github.com/yourusername/naver-flight-mcp/issues"
+  },
   "type": "module",
   "bin": {
     "naver-flight-mcp": "./dist/index.js"
@@ -15,10 +32,13 @@
     "start": "node dist/index.js"
   },
   "dependencies": {
-    "mcp-framework": "^0.2.15"
+    "mcp-framework": "^0.2.15",
+    "node-fetch": "^3.3.2"
   },
   "devDependencies": {
     "@types/node": "^20.11.24",
+    "@types/node-fetch": "^2.6.11",
+    "playwright": "^1.56.1",
     "typescript": "^5.3.3"
   },
   "engines": {

@@ -1,149 +1,107 @@
 # naver-flight-mcp
 
-A Model Context Protocol (MCP) server built with mcp-framework.
+네이버 항공권 검색 API를 사용하여 최저가 항공권 정보를 조회하는 Model Context Protocol (MCP) 서버입니다.
 
-## Quick Start
+## 기능
 
-```bash
-# Install dependencies
-npm install
+- 직항 항공권 최저가 검색 (성인 1명, 이코노미 클래스)
+- 왕복 항공편 정보 조회
+- 최저가 순으로 상위 10개 항공권 정보 제공
+- 출발/도착 시간, 소요시간, 항공편명 등 상세 정보
 
-# Build the project
-npm run build
+## 설치 및 사용
 
-```
+### Cursor / Claude Desktop에서 사용
 
-## Project Structure
-
-```
-naver-flight-mcp/
-├── src/
-│   ├── tools/        # MCP Tools
-│   │   └── ExampleTool.ts
-│   └── index.ts      # Server entry point
-├── package.json
-└── tsconfig.json
-```
-
-## Adding Components
-
-The project comes with an example tool in `src/tools/ExampleTool.ts`. You can add more tools using the CLI:
-
-```bash
-# Add a new tool
-mcp add tool my-tool
-
-# Example tools you might create:
-mcp add tool data-processor
-mcp add tool api-client
-mcp add tool file-handler
-```
-
-## Tool Development
-
-Example tool structure:
-
-```typescript
-import { MCPTool } from "mcp-framework";
-import { z } from "zod";
-
-interface MyToolInput {
-  message: string;
-}
-
-class MyTool extends MCPTool<MyToolInput> {
-  name = "my_tool";
-  description = "Describes what your tool does";
-
-  schema = {
-    message: {
-      type: z.string(),
-      description: "Description of this input parameter",
-    },
-  };
-
-  async execute(input: MyToolInput) {
-    // Your tool logic here
-    return `Processed: ${input.message}`;
-  }
-}
-
-export default MyTool;
-```
-
-## Publishing to npm
-
-1. Update your package.json:
-   - Ensure `name` is unique and follows npm naming conventions
-   - Set appropriate `version`
-   - Add `description`, `author`, `license`, etc.
-   - Check `bin` points to the correct entry file
-
-2. Build and test locally:
-   ```bash
-   npm run build
-   npm link
-   naver-flight-mcp  # Test your CLI locally
-   ```
-
-3. Login to npm (create account if necessary):
-   ```bash
-   npm login
-   ```
-
-4. Publish your package:
-   ```bash
-   npm publish
-   ```
-
-After publishing, users can add it to their claude desktop client (read below) or run it with npx
-```
-
-## Using with Claude Desktop
-
-### Local Development
-
-Add this configuration to your Claude Desktop config file:
-
-**MacOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
 **Windows**: `%APPDATA%/Claude/claude_desktop_config.json`
+**MacOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
+
+#### 로컬 개발 시
 
 ```json
 {
   "mcpServers": {
     "naver-flight-mcp": {
       "command": "node",
-      "args":["/absolute/path/to/naver-flight-mcp/dist/index.js"]
+      "args": ["C:...{실제 루트경로}/naver-flight-mcp/dist/index.js"]
     }
   }
 }
 ```
 
-### After Publishing
-
-Add this configuration to your Claude Desktop config file:
-
-**MacOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
-**Windows**: `%APPDATA%/Claude/claude_desktop_config.json`
+#### npm 패키지 배포 후
 
 ```json
 {
   "mcpServers": {
     "naver-flight-mcp": {
       "command": "npx",
-      "args": ["naver-flight-mcp"]
+      "args": ["-y", "naver-flight-mcp"]
     }
   }
 }
 ```
 
-## Building and Testing
+### 개발자용
 
-1. Make changes to your tools
-2. Run `npm run build` to compile
-3. The server will automatically load your tools on startup
+```bash
+# 의존성 설치
+npm install
 
-## Learn More
+# 빌드
+npm run build
 
-- [MCP Framework Github](https://github.com/QuantGeekDev/mcp-framework)
-- [MCP Framework Docs](https://mcp-framework.com)
+# 로컬 테스트
+npm link
+```
+
+## 사용 예시
+
+### search_naver_flights 도구
+
+```typescript
+{
+  departure: "PUS",      // 출발지 공항 코드 (예: PUS, ICN, GMP)
+  arrival: "KIX",        // 도착지 공항 코드 (예: TYO, NRT, KIX)
+  departureDate: "2025-12-02",  // 출발일 (YYYY-MM-DD)
+  returnDate: "2025-12-09"      // 복귀일 (YYYY-MM-DD)
+}
+```
+
+**출력 형식:**
+
+| 순위 | 출발일   | 복귀일   | 가는편 | 오는편 | 총요금    | 가는편 출발 | 가는편 도착 | 소요시간 | 오는편 출발 | 오는편 도착 | 소요시간 |
+| ---- | -------- | -------- | ------ | ------ | --------- | ----------- | ----------- | -------- | ----------- | ----------- | -------- |
+| 1    | 20251202 | 20251209 | BX0126 | BX0123 | 153,000원 | 11:25       | 12:55       | 90분     | 11:00       | 13:00       | 120분    |
+
+## 프로젝트 구조
+
+```
+naver-flight-mcp/
+├── src/
+│   ├── tools/
+│   │   └── NaverFlightSearch.ts  # 네이버 항공권 검색 도구
+│   └── index.ts                   # MCP 서버 진입점
+├── dist/                          # 빌드된 파일
+├── NAVER_FLIGHT_API_ANALYSIS.md  # API 분석 문서
+├── NAVER_FLIGHT_MCP_TEST_RESULTS.md  # 테스트 결과
+├── package.json
+├── tsconfig.json
+└── README.md
+```
+
+## API 정보
+
+- **엔드포인트**: `https://flight-api.naver.com/flight/international/searchFlights`
+- **방식**: REST API (Server-Sent Events)
+- **검색 조건**: 성인 1명, 직항만, 이코노미 클래스 (고정)
+
+자세한 API 분석은 `NAVER_FLIGHT_API_ANALYSIS.md` 참고
+
+## 테스트 결과
+
+다양한 노선에 대한 테스트 결과는 `NAVER_FLIGHT_MCP_TEST_RESULTS.md` 참고
+
+## 라이선스
+
+MIT

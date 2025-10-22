@@ -5,3 +5,13 @@ logs
 .DS_Store
 .idea
 .vscode
+
+# 테스트 및 디버깅 파일
+test*.js
+debug*.js
+analyze*.js
+parse*.js
+extract*.js
+network_*.json
+*_response*.json
+*_request*.json

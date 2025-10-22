@@ -10,40 +10,39 @@ from datetime import datetime, timedelta
 # UTF-8 인코딩 설정
 sys.stdout.reconfigure(encoding='utf-8')
 
-def process_naver_flight_data(origin='PUS', destination='NRT', file_path=None):
+def process_naver_flight_data(file_path, origin=None, destination=None):
     """네이버 항공권 데이터 통합 처리 (단일 파일)"""
-    route_name = f"{origin} ↔ {destination}"
     
-    print(f"=== {route_name} 네이버 항공권 데이터 통합 처리 ===")
-    
-    # 파일 경로 결정
-    if file_path:
-        target_file = file_path
-    else:
-        # 기본 패턴으로 파일 찾기
-        pattern = f'{origin}_{destination}_naver_flights_*.json'
-        flight_files = glob.glob(pattern)
-        if not flight_files:
-            print(f"❌ {pattern} 파일을 찾을 수 없습니다.")
-            print("먼저 flight_search_naver.py로 검색을 실행해주세요.")
-            return []
-        target_file = flight_files[0]  # 가장 최근 파일 사용
-        if len(flight_files) > 1:
-            print(f"⚠ 여러 파일 발견됨. 가장 최근 파일 사용: {target_file}")
-    
-    print(f"처리할 파일: {target_file}")
+    print(f"=== 네이버 항공권 데이터 통합 처리 ===")
+    print(f"처리할 파일: {file_path}")
     
     try:
-        with open(target_file, 'r', encoding='utf-8') as f:
+        with open(file_path, 'r', encoding='utf-8') as f:
             data = json.load(f)
             flight_results = data['naver_flight_results']
-            print(f"✓ {target_file}: {len(flight_results)}개 항공편 로드")
+            print(f"✓ {file_path}: {len(flight_results)}개 항공편 로드")
+            
+            # 파일에서 출발지/목적지 자동 감지
+            if not origin or not destination:
+                search_params = data.get('search_parameters', {})
+                detected_origin = search_params.get('origin', 'UNKNOWN')
+                detected_destination = search_params.get('destination', 'UNKNOWN')
+                
+                if not origin:
+                    origin = detected_origin
+                if not destination:
+                    destination = detected_destination
+                    
+                print(f"✓ 출발지/목적지 자동 감지: {origin} ↔ {destination}")
+                
     except FileNotFoundError:
-        print(f"❌ {target_file} 파일을 찾을 수 없습니다.")
+        print(f"❌ {file_path} 파일을 찾을 수 없습니다.")
         return []
     except Exception as e:
-        print(f"❌ {target_file} 처리 중 오류: {e}")
+        print(f"❌ {file_path} 처리 중 오류: {e}")
         return []
+    
+    route_name = f"{origin} ↔ {destination}"
     
     if not flight_results:
         print("처리할 데이터가 없습니다.")
@@ -92,19 +91,86 @@ def process_naver_flight_data(origin='PUS', destination='NRT', file_path=None):
     # 가격순으로 정렬
     unique_flights_list.sort(key=lambda x: x['price_numeric'])
     
-    # 상위 3개 결과
-    top_3_results = unique_flights_list[:3]
+    # 상위 5개 결과
+    top_5_results = unique_flights_list[:5]
+    
+    # 주말 필터링 함수
+    def is_weekend_included(departure_date, return_date):
+        """출발일과 복귀일 사이에 주말이 포함되는지 확인"""
+        try:
+            dep_date = datetime.strptime(departure_date, '%Y-%m-%d')
+            ret_date = datetime.strptime(return_date, '%Y-%m-%d')
+            
+            # 출발일부터 복귀일까지의 모든 날짜 확인
+            current_date = dep_date
+            weekend_count = 0
+            
+            while current_date <= ret_date:
+                # 토요일(5) 또는 일요일(6)인지 확인
+                if current_date.weekday() in [5, 6]:
+                    weekend_count += 1
+                current_date += timedelta(days=1)
+            
+            return weekend_count
+        except:
+            return 0
+    
+    # 주말 하루 포함된 항공편 필터링
+    weekend_one_day_flights = []
+    for flight in unique_flights_list:
+        weekend_count = is_weekend_included(flight['departure_date'], flight['return_date'])
+        if weekend_count == 1:
+            weekend_one_day_flights.append(flight)
+    
+    # 주말 모두 포함된 항공편 필터링 (2일 이상)
+    weekend_all_flights = []
+    for flight in unique_flights_list:
+        weekend_count = is_weekend_included(flight['departure_date'], flight['return_date'])
+        if weekend_count >= 2:
+            weekend_all_flights.append(flight)
+    
+    # 주말 하루 포함 상위 3개
+    weekend_one_day_top3 = weekend_one_day_flights[:3]
+    
+    # 주말 모두 포함 상위 3개
+    weekend_all_top3 = weekend_all_flights[:3]
     
     # 결과 출력
-    print(f"\n=== {route_name} 네이버 항공권 최저가 상위 3개 ===")
+    print(f"\n=== {route_name} 네이버 항공권 최저가 상위 5개 ===")
     
-    for i, result in enumerate(top_3_results, 1):
+    for i, result in enumerate(top_5_results, 1):
         print(f"{i}위: {result['total_price']}")
         print(f"   출발: {result['departure_date']} ({result['departure_time']})")
         print(f"   도착: {result['arrival_time']} (소요시간: {result['duration']})")
         print(f"   귀국: {result['return_date']} ({result['return_departure_time']} → {result['return_arrival_time']})")
         print(f"   항공편: {result['flight_number']}")
         print()
+    
+    # 주말 하루 포함 상위 3개 출력
+    if weekend_one_day_top3:
+        print(f"\n=== {route_name} 주말 하루 포함 상위 3개 ===")
+        for i, result in enumerate(weekend_one_day_top3, 1):
+            print(f"{i}위: {result['total_price']}")
+            print(f"   출발: {result['departure_date']} ({result['departure_time']})")
+            print(f"   도착: {result['arrival_time']} (소요시간: {result['duration']})")
+            print(f"   귀국: {result['return_date']} ({result['return_departure_time']} → {result['return_arrival_time']})")
+            print(f"   항공편: {result['flight_number']}")
+            print()
+    else:
+        print(f"\n=== {route_name} 주말 하루 포함 항공편 없음 ===")
+    
+    # 주말 모두 포함 상위 3개 출력
+    if weekend_all_top3:
+        print(f"\n=== {route_name} 주말 모두 포함 상위 3개 ===")
+        for i, result in enumerate(weekend_all_top3, 1):
+            print(f"{i}위: {result['total_price']}")
+            print(f"   출발: {result['departure_date']} ({result['departure_time']})")
+            print(f"   도착: {result['arrival_time']} (소요시간: {result['duration']})")
+            print(f"   귀국: {result['return_date']} ({result['return_departure_time']} → {result['return_arrival_time']})")
+            print(f"   항공편: {result['flight_number']}")
+            print()
+    else:
+        print(f"\n=== {route_name} 주말 모두 포함 항공편 없음 ===")
     
     # 결과를 JSON 파일로 저장
     results_data = {
@@ -115,9 +181,11 @@ def process_naver_flight_data(origin='PUS', destination='NRT', file_path=None):
             'passengers': '성인 1명',
             'total_combinations': len(unique_flights_list),
             'analysis_date': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-            'source_file': target_file
+            'source_file': file_path
         },
-        'top_3_results': top_3_results,
+        'top_5_results': top_5_results,
+        'weekend_one_day_top3': weekend_one_day_top3,
+        'weekend_all_top3': weekend_all_top3,
         'all_results': unique_flights_list[:10]  # 상위 10개만 저장
     }
     
@@ -132,7 +200,7 @@ def process_naver_flight_data(origin='PUS', destination='NRT', file_path=None):
     # 최종 요약 보고서 생성
     create_naver_summary_report(results_data, unique_flights_list, origin, destination)
     
-    return top_3_results
+    return top_5_results
 
 def create_naver_summary_report(results_data, unique_flights_list, origin='PUS', destination='NRT'):
     """네이버 항공권 최종 요약 보고서 생성 (재사용 가능)"""
@@ -162,14 +230,36 @@ def create_naver_summary_report(results_data, unique_flights_list, origin='PUS',
 - **승객**: 성인 1명
 - **체류일**: 검색 조건에 따라 결정
 
-## 최저가 상위 3개 결과
+## 최저가 상위 5개 결과
 
 | 순위 | 출발일     | 복귀일     | 항공편   | 총요금   | 출발시간 | 도착시간 | 소요시간   |
 | ---- | ---------- | ---------- | -------- | -------- | -------- | -------- | ---------- |
 """
     
-    for i, result in enumerate(results_data['top_3_results'], 1):
+    for i, result in enumerate(results_data['top_5_results'], 1):
         summary_content += f"| {i} | {result['departure_date']} | {result['return_date']} | {result['flight_number']} | {result['total_price']} | {result['departure_time']} | {result['arrival_time']} | {result['duration']} |\n"
+    
+    # 주말 하루 포함 결과 추가
+    if results_data['weekend_one_day_top3']:
+        summary_content += f"""
+## 주말 하루 포함 상위 3개 결과
+
+| 순위 | 출발일     | 복귀일     | 항공편   | 총요금   | 출발시간 | 도착시간 | 소요시간   |
+| ---- | ---------- | ---------- | -------- | -------- | -------- | -------- | ---------- |
+"""
+        for i, result in enumerate(results_data['weekend_one_day_top3'], 1):
+            summary_content += f"| {i} | {result['departure_date']} | {result['return_date']} | {result['flight_number']} | {result['total_price']} | {result['departure_time']} | {result['arrival_time']} | {result['duration']} |\n"
+    
+    # 주말 모두 포함 결과 추가
+    if results_data['weekend_all_top3']:
+        summary_content += f"""
+## 주말 모두 포함 상위 3개 결과
+
+| 순위 | 출발일     | 복귀일     | 항공편   | 총요금   | 출발시간 | 도착시간 | 소요시간   |
+| ---- | ---------- | ---------- | -------- | -------- | -------- | -------- | ---------- |
+"""
+        for i, result in enumerate(results_data['weekend_all_top3'], 1):
+            summary_content += f"| {i} | {result['departure_date']} | {result['return_date']} | {result['flight_number']} | {result['total_price']} | {result['departure_time']} | {result['arrival_time']} | {result['duration']} |\n"
     
     # 통계 정보
     price_range = [f['price_numeric'] for f in unique_flights_list]
@@ -217,12 +307,12 @@ def create_naver_summary_report(results_data, unique_flights_list, origin='PUS',
 
 ## 결론
 
-**최저가 항공편**: {results_data['top_3_results'][0]['flight_number']} {results_data['top_3_results'][0]['total_price']}
+**최저가 항공편**: {results_data['top_5_results'][0]['flight_number']} {results_data['top_5_results'][0]['total_price']}
 
-- 출발: {results_data['top_3_results'][0]['departure_date']} ({results_data['top_3_results'][0]['departure_time']})
-- 복귀: {results_data['top_3_results'][0]['return_date']} ({results_data['top_3_results'][0]['return_departure_time']})
-- 체류: {results_data['top_3_results'][0]['stay_days']}일
-- 소요시간: {results_data['top_3_results'][0]['duration']}
+- 출발: {results_data['top_5_results'][0]['departure_date']} ({results_data['top_5_results'][0]['departure_time']})
+- 복귀: {results_data['top_5_results'][0]['return_date']} ({results_data['top_5_results'][0]['return_departure_time']})
+- 체류: {results_data['top_5_results'][0]['stay_days']}일
+- 소요시간: {results_data['top_5_results'][0]['duration']}
 
 이 항공편이 검색 기간 중 {route_name} 노선의 최저가 항공편입니다.
 
@@ -241,25 +331,26 @@ def create_naver_summary_report(results_data, unique_flights_list, origin='PUS',
 def main():
     """메인 실행 함수"""
     parser = argparse.ArgumentParser(description='네이버 항공권 데이터 통합 처리 도구')
-    parser.add_argument('--origin', '-o', default='PUS', help='출발지 공항코드 (기본값: PUS)')
-    parser.add_argument('--destination', '-d', default='NRT', help='도착지 공항코드 (기본값: NRT)')
-    parser.add_argument('--file', '-f', help='처리할 JSON 파일 경로')
+    parser.add_argument('file_path', help='처리할 JSON 파일 경로')
+    parser.add_argument('--origin', '-o', help='출발지 공항코드 (자동 감지 가능)')
+    parser.add_argument('--destination', '-d', help='도착지 공항코드 (자동 감지 가능)')
     
     args = parser.parse_args()
     
     try:
         # 네이버 항공권 데이터 처리
         results = process_naver_flight_data(
-            origin=args.origin.upper(),
-            destination=args.destination.upper(),
-            file_path=args.file
+            file_path=args.file_path,
+            origin=args.origin.upper() if args.origin else None,
+            destination=args.destination.upper() if args.destination else None
         )
         
         if results:
-            print(f"\n✅ {args.origin} ↔ {args.destination} 네이버 항공권 데이터 처리 완료!")
-            print(f"상위 3개 최저가 항공편을 찾았습니다.")
+            print(f"\n✅ 네이버 항공권 데이터 처리 완료!")
+            print(f"상위 5개 최저가 항공편을 찾았습니다.")
+            print(f"주말 필터링 결과도 함께 제공됩니다.")
         else:
-            print(f"\n❌ {args.origin} ↔ {args.destination} 네이버 항공권 데이터 처리 실패")
+            print(f"\n❌ 네이버 항공권 데이터 처리 실패")
             print("검색 결과 파일을 확인해주세요.")
         
     except KeyboardInterrupt:

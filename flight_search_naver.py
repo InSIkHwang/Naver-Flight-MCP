@@ -24,7 +24,7 @@ def parse_price(price_str):
     except ValueError:
         return float('inf')
 
-def call_naver_flight_mcp(departure, arrival, departure_date, return_date):
+def call_naver_flight_mcp(departure, arrival, departure_date, return_date, airlines=None):
     """네이버 항공권 MCP 호출"""
     try:
         print(f"네이버 항공권 검색: {departure} → {arrival}")
@@ -43,18 +43,24 @@ def call_naver_flight_mcp(departure, arrival, departure_date, return_date):
         )
         
         # JSON-RPC 요청 구성
+        request_args = {
+            "departure": departure,
+            "arrival": arrival,
+            "departureDate": departure_date,
+            "returnDate": return_date
+        }
+        
+        # 항공사 정보가 있으면 추가
+        if airlines and len(airlines) > 0:
+            request_args["airlines"] = airlines
+            
         request = {
             "jsonrpc": "2.0",
             "id": 1,
             "method": "tools/call",
             "params": {
                 "name": "search_naver_flights",
-                "arguments": {
-                    "departure": departure,
-                    "arrival": arrival,
-                    "departureDate": departure_date,
-                    "returnDate": return_date
-                }
+                "arguments": request_args
             }
         }
         
@@ -155,6 +161,8 @@ def search_flights_naver(params):
     print(f"  - 기간: {params['start_date']} ~ {params['end_date']}")
     print(f"  - 체류일: 현지 체류 {params['stay_days']}일 (출발일+{params['stay_days']-1}일=복귀일)")
     print(f"  - 승객: 성인 {params['adults']}명")
+    if params.get('airlines'):
+        print(f"  - 항공사: {', '.join(params['airlines'])}")
     
     try:
         # 날짜 범위 생성
@@ -193,7 +201,8 @@ def search_flights_naver(params):
                     departure=params['origin'],
                     arrival=params['destination'],
                     departure_date=depart_date.strftime('%Y-%m-%d'),
-                    return_date=return_date.strftime('%Y-%m-%d')
+                    return_date=return_date.strftime('%Y-%m-%d'),
+                    airlines=params.get('airlines')
                 )
                 
                 if result:
@@ -296,6 +305,7 @@ def main():
     parser.add_argument('--end-date', '-e', help='검색 종료일 (YYYY-MM-DD)')
     parser.add_argument('--stay-days', type=int, default=5, help='체류일 수 (기본값: 5일)')
     parser.add_argument('--adults', type=int, default=1, help='성인 승객 수 (기본값: 1)')
+    parser.add_argument('--airlines', nargs='*', help='검색할 항공사 코드 또는 이름 (예: KE, 7C, 대한항공, 제주항공)')
     parser.add_argument('--save', action='store_true', help='결과를 JSON 파일로 저장')
     
     args = parser.parse_args()
@@ -312,7 +322,8 @@ def main():
         'start_date': args.start_date,
         'end_date': args.end_date,
         'stay_days': args.stay_days,
-        'adults': args.adults
+        'adults': args.adults,
+        'airlines': args.airlines
     }
     
     try:

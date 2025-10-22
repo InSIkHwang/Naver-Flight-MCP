@@ -219,6 +219,23 @@ async function makeNaverFlightRequest<T>(
   return null;
 }
 
+// 항공사 코드 매핑
+const AIRLINE_CODE_MAP: Record<string, string> = {
+  제주항공: "7C",
+  에어부산: "BX",
+  진에어: "LJ",
+  대한항공: "KE",
+  아시아나항공: "OZ",
+  "일본 항공": "JL",
+  JAL: "JL",
+  "Korean Air": "KE",
+  Asiana: "OZ",
+  "Jeju Air": "7C",
+  "Air Busan": "BX",
+  "Jin Air": "LJ",
+  "Vietnam Airlines": "VN",
+};
+
 // 유틸리티 함수들
 function formatDate(dateStr: string): string {
   // YYYY-MM-DD -> YYYYMMDD
@@ -310,11 +327,27 @@ function validateDate(dateStr: string): boolean {
   return date >= minDate;
 }
 
+function normalizeAirlineCodes(airlines: string[]): string[] {
+  return airlines
+    .map((airline) => {
+      // 이미 코드인 경우 (2-3자리 대문자)
+      if (/^[A-Z]{2,3}$/.test(airline)) {
+        return airline;
+      }
+
+      // 항공사 이름인 경우 코드로 변환
+      const normalizedName = airline.trim();
+      return AIRLINE_CODE_MAP[normalizedName] || airline;
+    })
+    .filter((code) => code && code.length > 0);
+}
+
 function createFlightSearchPayload(
   departure: string,
   arrival: string,
   departureDate: string,
-  returnDate: string
+  returnDate: string,
+  airlines?: string[]
 ) {
   return {
     adultCount: 1,
@@ -343,7 +376,7 @@ function createFlightSearchPayload(
     openReturnDays: 0,
     flightFilter: {
       filter: {
-        airlines: [],
+        airlines: airlines || [],
         departureAirports: [[departure], []],
         arrivalAirports: [[], [departure]],
         departureTime: [],
@@ -491,11 +524,21 @@ export async function searchNaverFlights(
   departure: string,
   arrival: string,
   departureDate: string,
-  returnDate: string
+  returnDate: string,
+  airlines?: string[]
 ): Promise<{ content: Array<{ type: "text"; text: string }> }> {
   try {
+    // 항공사 코드 정규화
+    const normalizedAirlines = airlines
+      ? normalizeAirlineCodes(airlines)
+      : undefined;
+
     console.log(
-      `네이버 항공권 검색 시작: ${departure} → ${arrival}, ${departureDate} ~ ${returnDate}`
+      `네이버 항공권 검색 시작: ${departure} → ${arrival}, ${departureDate} ~ ${returnDate}${
+        normalizedAirlines && normalizedAirlines.length > 0
+          ? `, 항공사: ${normalizedAirlines.join(", ")}`
+          : ""
+      }`
     );
 
     // 검색 간격 제어 (Rate Limiting 방지)
@@ -551,7 +594,8 @@ export async function searchNaverFlights(
       departure,
       arrival,
       departureDate,
-      returnDate
+      returnDate,
+      normalizedAirlines
     );
 
     console.log("API 요청 페이로드 생성 완료");
@@ -596,7 +640,11 @@ export async function searchNaverFlights(
       "\n"
     )}`;
 
-    const summary = `\n\n**검색 요약:**\n- 출발지: ${departure} → 도착지: ${arrival}\n- 출발일: ${departureDate}\n- 복귀일: ${returnDate}\n- 총 ${
+    const summary = `\n\n**검색 요약:**\n- 출발지: ${departure} → 도착지: ${arrival}\n- 출발일: ${departureDate}\n- 복귀일: ${returnDate}${
+      airlines && airlines.length > 0
+        ? `\n- 항공사 필터: ${airlines.join(", ")}`
+        : ""
+    }\n- 총 ${
       processedFlights.length
     }개 항공권 발견\n- 최저가: ${processedFlights[0]?.totalFare.toLocaleString()}원`;
 

@@ -10,53 +10,49 @@ from datetime import datetime, timedelta
 # UTF-8 인코딩 설정
 sys.stdout.reconfigure(encoding='utf-8')
 
-def process_naver_flight_data(origin='PUS', destination='NRT', pattern=None):
-    """네이버 항공권 데이터 통합 처리 (재사용 가능)"""
-    if pattern:
-        # 사용자 지정 패턴 사용
-        flight_files = glob.glob(pattern)
-        route_name = f"{origin} ↔ {destination}"
-    else:
-        # 기본 패턴: {ORIGIN}_{DESTINATION}_naver_flights_*.json
-        pattern = f'{origin}_{destination}_naver_flights_*.json'
-        flight_files = glob.glob(pattern)
-        route_name = f"{origin} ↔ {destination}"
+def process_naver_flight_data(origin='PUS', destination='NRT', file_path=None):
+    """네이버 항공권 데이터 통합 처리 (단일 파일)"""
+    route_name = f"{origin} ↔ {destination}"
     
     print(f"=== {route_name} 네이버 항공권 데이터 통합 처리 ===")
     
-    if not flight_files:
-        print(f"❌ {pattern} 파일을 찾을 수 없습니다.")
-        print("먼저 flight_search_naver.py로 검색을 실행해주세요.")
+    # 파일 경로 결정
+    if file_path:
+        target_file = file_path
+    else:
+        # 기본 패턴으로 파일 찾기
+        pattern = f'{origin}_{destination}_naver_flights_*.json'
+        flight_files = glob.glob(pattern)
+        if not flight_files:
+            print(f"❌ {pattern} 파일을 찾을 수 없습니다.")
+            print("먼저 flight_search_naver.py로 검색을 실행해주세요.")
+            return []
+        target_file = flight_files[0]  # 가장 최근 파일 사용
+        if len(flight_files) > 1:
+            print(f"⚠ 여러 파일 발견됨. 가장 최근 파일 사용: {target_file}")
+    
+    print(f"처리할 파일: {target_file}")
+    
+    try:
+        with open(target_file, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+            flight_results = data['naver_flight_results']
+            print(f"✓ {target_file}: {len(flight_results)}개 항공편 로드")
+    except FileNotFoundError:
+        print(f"❌ {target_file} 파일을 찾을 수 없습니다.")
+        return []
+    except Exception as e:
+        print(f"❌ {target_file} 처리 중 오류: {e}")
         return []
     
-    print(f"발견된 파일: {len(flight_files)}개")
-    for file in flight_files:
-        print(f"  - {file}")
-    
-    all_flight_results = []
-    
-    for file_name in flight_files:
-        try:
-            with open(file_name, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-                flight_results = data['naver_flight_results']
-                all_flight_results.extend(flight_results)
-                print(f"✓ {file_name}: {len(flight_results)}개 항공편 로드")
-        except FileNotFoundError:
-            print(f"⚠ {file_name} 파일을 찾을 수 없습니다.")
-            continue
-        except Exception as e:
-            print(f"⚠ {file_name} 처리 중 오류: {e}")
-            continue
-    
-    if not all_flight_results:
+    if not flight_results:
         print("처리할 데이터가 없습니다.")
         return []
     
     # 유효한 항공편만 필터링
     valid_flights = []
     
-    for option in all_flight_results:
+    for option in flight_results:
         flight_info = option.get('flight_info', {})
         
         # 가격이 있는 항공편만 유지
@@ -69,14 +65,14 @@ def process_naver_flight_data(origin='PUS', destination='NRT', pattern=None):
                     'departure_date': option['departure_date'],
                     'return_date': option['return_date'],
                     'stay_days': option['stay_days'],
-                    'flight_number': flight_info.get('flight_number', 'N/A'),
+                    'flight_number': flight_info.get('outbound_flight', 'N/A'),
                     'total_price': flight_info.get('total_price', 'N/A'),
                     'price_numeric': price_numeric,
-                    'departure_time': flight_info.get('departure_time', 'N/A'),
-                    'arrival_time': flight_info.get('arrival_time', 'N/A'),
-                    'duration': flight_info.get('duration', 'N/A'),
-                    'return_departure_time': flight_info.get('return_departure_time', 'N/A'),
-                    'return_arrival_time': flight_info.get('return_arrival_time', 'N/A'),
+                    'departure_time': flight_info.get('outbound_departure', 'N/A'),
+                    'arrival_time': flight_info.get('outbound_arrival', 'N/A'),
+                    'duration': flight_info.get('outbound_duration', 'N/A'),
+                    'return_departure_time': flight_info.get('return_departure', 'N/A'),
+                    'return_arrival_time': flight_info.get('return_arrival', 'N/A'),
                     'return_duration': flight_info.get('return_duration', 'N/A')
                 })
             except ValueError:
@@ -119,7 +115,7 @@ def process_naver_flight_data(origin='PUS', destination='NRT', pattern=None):
             'passengers': '성인 1명',
             'total_combinations': len(unique_flights_list),
             'analysis_date': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-            'monthly_files_processed': flight_files
+            'source_file': target_file
         },
         'top_3_results': top_3_results,
         'all_results': unique_flights_list[:10]  # 상위 10개만 저장
@@ -247,7 +243,7 @@ def main():
     parser = argparse.ArgumentParser(description='네이버 항공권 데이터 통합 처리 도구')
     parser.add_argument('--origin', '-o', default='PUS', help='출발지 공항코드 (기본값: PUS)')
     parser.add_argument('--destination', '-d', default='NRT', help='도착지 공항코드 (기본값: NRT)')
-    parser.add_argument('--pattern', '-p', help='파일 검색 패턴 (예: "*_naver_flights_*.json")')
+    parser.add_argument('--file', '-f', help='처리할 JSON 파일 경로')
     
     args = parser.parse_args()
     
@@ -256,7 +252,7 @@ def main():
         results = process_naver_flight_data(
             origin=args.origin.upper(),
             destination=args.destination.upper(),
-            pattern=args.pattern
+            file_path=args.file
         )
         
         if results:

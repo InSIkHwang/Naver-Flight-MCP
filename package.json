@@ -27,17 +27,16 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsc && mcp-build",
+    "build": "tsc",
     "watch": "tsc --watch",
     "start": "node dist/index.js"
   },
   "dependencies": {
-    "mcp-framework": "^0.2.15",
+    "@modelcontextprotocol/sdk": "^1.20.1",
     "node-fetch": "^3.3.2"
   },
   "devDependencies": {
     "@types/node": "^20.11.24",
-    "@types/node-fetch": "^2.6.11",
     "playwright": "^1.56.1",
     "typescript": "^5.3.3"
   },

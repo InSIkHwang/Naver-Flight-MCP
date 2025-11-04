@@ -349,6 +349,9 @@ function createFlightSearchPayload(
   returnDate: string,
   airlines?: string[]
 ) {
+  // 항공사 필터가 있으면 isSameAirlines를 true로 설정
+  const hasAirlineFilter = airlines && airlines.length > 0;
+
   return {
     adultCount: 1,
     childCount: 0,
@@ -385,7 +388,7 @@ function createFlightSearchPayload(
         hasCardBenefit: true,
         isIndividual: false,
         isLowCarbonEmission: false,
-        isSameAirlines: false,
+        isSameAirlines: hasAirlineFilter, // 항공사 필터가 있으면 true로 설정
         isSameDepArrAirport: true,
         isTravelClub: false,
         minFare: {},
@@ -396,7 +399,7 @@ function createFlightSearchPayload(
       skip: 0,
       sort: { adultMinFare: 1 },
     },
-    initialRequest: true,
+    initialRequest: false, // 사용자 요청 형식에 맞게 false로 변경
   };
 }
 

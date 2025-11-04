@@ -1,9 +1,9 @@
 python flight_search_naver.py --origin PUS --destination NRT --start-date 2025-12-10 --end-date 2025-12-12 --stay-days 5 --airlines 7C KE --save
 
-python flight_search_naver.py --origin PUS --destination SGN --start-date 2025-12-01 --end-date 2025-12-31 --stay-days 6 --airlines Vietnam Airlines --save
+python flight_search_naver.py --origin PUS --destination SGN --start-date 2026-01-01 --end-date 2026-02-28 --stay-days 6 --airlines VN --save
 
 # 혼합 사용
 python flight_search_naver.py --origin PUS --destination NRT --start-date 2025-12-10 --end-date 2025-12-12 --stay-days 5 --airlines 7C 대한항공 --save
 
 
-python process_naver_flight_data.py PUS_NRT_naver_flights_20251022_162807.json
+python process_naver_flight_data.py .json
